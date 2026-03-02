@@ -11,6 +11,8 @@ app.use(cookieParser());
 
 // Mount the authentication routes
 app.use("/auth", authRoutes);
+import { kycRoutes } from "./modules/kyc/kyc.routes";
+app.use("/kyc", kycRoutes);
 
 // Health check endpoint
 app.get("/health", (req, res) => {

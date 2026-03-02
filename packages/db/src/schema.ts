@@ -57,6 +57,21 @@ export const otpTokens = pgTable("otp_tokens", {
     attempts: integer("attempts").notNull().default(0),
 });
 
+export const kycRecords = pgTable("kyc_records", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    panNumber: text("pan_number").notNull(),
+    aadhaarMasked: text("aadhaar_masked"),
+    companyPan: text("company_pan"),
+    cinOrLlpin: text("cin_or_llpin"),
+    gstNumber: text("gst_number"),
+    status: kycStatusEnum("status").notNull().default("PENDING"),
+    reviewerId: uuid("reviewer_id").references(() => users.id, { onDelete: "set null" }),
+    rejectionReason: text("rejection_reason"),
+    submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+    reviewedAt: timestamp("reviewed_at"),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
     profile: one(profiles, {
@@ -65,6 +80,10 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     }),
     sessions: many(sessions),
     auditLogs: many(auditLogs),
+    kycRecord: one(kycRecords, {
+        fields: [users.id],
+        references: [kycRecords.userId],
+    })
 }));
 
 export const profilesRelations = relations(profiles, ({ one }) => ({

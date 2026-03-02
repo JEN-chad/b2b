@@ -10,6 +10,7 @@ export const envSchema = z.object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     JWT_SECRET: z.string(),
     JWT_REFRESH_SECRET: z.string(),
+    KYC_ENFORCEMENT: z.enum(["STRICT", "BYPASS"]).default("STRICT"),
 });
 
 export type Env = z.infer<typeof envSchema>;

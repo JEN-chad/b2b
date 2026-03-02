@@ -41,7 +41,7 @@ export const requireRole = (roles: string[]) => {
 };
 
 export const requireApprovedKYC = (req: Request, res: Response, next: NextFunction) => {
-    if (process.env.KYC_ENFORCEMENT === "BYPASS") {
+    if (env.KYC_ENFORCEMENT === "BYPASS") {
         return next();
     }
 
