@@ -1,0 +1,38 @@
+import express from "express";
+import cookieParser from "cookie-parser";
+import { globalErrorHandler } from "./middleware/error.middleware";
+import { authRoutes } from "./modules/auth/auth.routes";
+import { env } from "@b2b/config";
+
+const app = express();
+
+app.use(express.json());
+app.use(cookieParser());
+
+// Mount the authentication routes
+app.use("/auth", authRoutes);
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+    res.status(200).json({ status: "OK" });
+});
+
+// Centralized error handling
+app.use(globalErrorHandler);
+
+const startServer = () => {
+    try {
+        app.listen(env.PORT, () => {
+            console.log(`🚀 API Server running on port ${env.PORT}`);
+        });
+    } catch (err) {
+        console.error("Failed to start server:", err);
+        process.exit(1);
+    }
+}
+
+if (require.main === module) {
+    startServer();
+}
+
+export { app };

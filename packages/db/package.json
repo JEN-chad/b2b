@@ -1,0 +1,27 @@
+{
+    "name": "@b2b/db",
+    "version": "1.0.0",
+    "private": true,
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc -w",
+        "lint": "eslint \"src/**/*.ts\"",
+        "db:push": "drizzle-kit push:pg",
+        "db:generate": "drizzle-kit generate:pg",
+        "db:studio": "drizzle-kit studio"
+    },
+    "dependencies": {
+        "@b2b/config": "workspace:*",
+        "@neondatabase/serverless": "^0.9.0",
+        "@types/ws": "^8.18.1",
+        "dotenv": "^16.4.0",
+        "drizzle-orm": "^0.30.0",
+        "ws": "^8.19.0"
+    },
+    "devDependencies": {
+        "drizzle-kit": "^0.20.14",
+        "typescript": "^5.0.0"
+    }
+}
