@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import { signupSchema, loginSchema, verifySchema } from "./auth.schema";
 import { AuthService } from "./auth.service";
 import bcrypt from "bcrypt";
-import { db, auditLogs } from "@b2b/db";
 
 export class AuthController {
     static async signup(req: Request, res: Response) {
@@ -36,16 +35,6 @@ export class AuthController {
                 return res.status(400).json({ error: "Invalid or expired OTP" });
             }
 
-            const user = await AuthService.findUserByEmail(email);
-            if (user) {
-                await db.insert(auditLogs).values({
-                    action: "EMAIL_VERIFIED",
-                    entityType: "USER",
-                    entityId: user.id,
-                    userId: user.id,
-                });
-            }
-
             res.json({ message: "Email verified successfully" });
         } catch (e: any) {
             res.status(400).json({ error: e.errors || "Invalid input" });
@@ -63,13 +52,7 @@ export class AuthController {
 
             const isValid = await bcrypt.compare(password, user.passwordHash);
             if (!isValid) {
-                await db.insert(auditLogs).values({
-                    action: "LOGIN_FAILED",
-                    entityType: "USER",
-                    entityId: user.id,
-                    userId: user.id,
-                    ipAddress: req.ip
-                });
+                await AuthService.logFailedLogin(user.id, req.ip);
                 return res.status(401).json({ error: "Invalid credentials" });
             }
 
@@ -77,16 +60,7 @@ export class AuthController {
                 return res.status(403).json({ error: "Please verify your email first" });
             }
 
-            const { accessToken, refreshToken } = await AuthService.createSession(user);
-
-            // Audit Success
-            await db.insert(auditLogs).values({
-                action: "USER_LOGIN",
-                entityType: "USER",
-                entityId: user.id,
-                userId: user.id,
-                ipAddress: req.ip
-            });
+            const { accessToken, refreshToken } = await AuthService.createSession(user, req.ip);
 
             res.cookie("accessToken", accessToken, {
                 httpOnly: true,

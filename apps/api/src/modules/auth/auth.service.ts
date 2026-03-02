@@ -54,75 +54,108 @@ export class AuthService {
     static async verifyOTP(email: string, code: string, type: "EMAIL_VERIFY" | "LOGIN" | "PHONE_VERIFY") {
         const now = new Date();
 
-        // Find valid token
-        const tokens = await db.select()
-            .from(otpTokens)
-            .where(
-                and(
-                    eq(otpTokens.emailOrPhone, email),
-                    eq(otpTokens.type, type),
-                    gt(otpTokens.expiresAt, now)
+        return await db.transaction(async (tx) => {
+            // Find valid token
+            const tokens = await tx.select()
+                .from(otpTokens)
+                .where(
+                    and(
+                        eq(otpTokens.emailOrPhone, email),
+                        eq(otpTokens.type, type),
+                        gt(otpTokens.expiresAt, now)
+                    )
                 )
-            )
-            .limit(1);
+                .limit(1);
 
-        const token = tokens[0];
-        if (!token) {
-            return false;
-        }
+            const token = tokens[0];
+            if (!token) {
+                return false;
+            }
 
-        if (token.attempts >= 3) {
-            return false;
-        }
+            if (token.attempts >= 3) {
+                return false;
+            }
 
-        const isValid = await bcrypt.compare(code, token.codeHash);
+            const isValid = await bcrypt.compare(code, token.codeHash);
 
-        if (!isValid) {
-            await db.update(otpTokens)
-                .set({ attempts: token.attempts + 1 })
-                .where(eq(otpTokens.id, token.id));
-            return false;
-        }
+            if (!isValid) {
+                await tx.update(otpTokens)
+                    .set({ attempts: token.attempts + 1 })
+                    .where(eq(otpTokens.id, token.id));
+                return false;
+            }
 
-        // Mark email as verified if needed
-        if (type === "EMAIL_VERIFY") {
-            await db.update(users)
-                .set({ emailVerified: true })
-                .where(eq(users.email, email));
-        }
+            // Mark email as verified if needed
+            if (type === "EMAIL_VERIFY") {
+                await tx.update(users)
+                    .set({ emailVerified: true })
+                    .where(eq(users.email, email));
 
-        // Delete token after successful use
-        await db.delete(otpTokens).where(eq(otpTokens.id, token.id));
-        return true;
+                // Get the user safely for logging
+                const [user] = await tx.select().from(users).where(eq(users.email, email)).limit(1);
+                if (user) {
+                    await tx.insert(auditLogs).values({
+                        action: "EMAIL_VERIFIED",
+                        entityType: "USER",
+                        entityId: user.id,
+                        userId: user.id,
+                    });
+                }
+            }
+
+            // Delete token after successful use
+            await tx.delete(otpTokens).where(eq(otpTokens.id, token.id));
+            return true;
+        });
     }
 
-    static async createSession(user: any) {
+    static async createSession(user: any, ipAddress?: string) {
         const refreshToken = crypto.randomBytes(40).toString('hex');
         const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
 
-        const [session] = await db.insert(sessions).values({
-            userId: user.id,
-            refreshTokenHash,
-            expiresAt: addDays(new Date(), 7),
-        }).returning();
-
-        const accessToken = jwt.sign(
-            {
+        return await db.transaction(async (tx) => {
+            const [session] = await tx.insert(sessions).values({
                 userId: user.id,
-                role: user.role,
-                kycStatus: user.kycStatus,
-                sessionId: session.id
-            },
-            env.JWT_SECRET,
-            { expiresIn: '15m' }
-        );
+                refreshTokenHash,
+                expiresAt: addDays(new Date(), 7),
+            }).returning();
 
-        return { accessToken, refreshToken, session };
+            await tx.insert(auditLogs).values({
+                action: "USER_LOGIN",
+                entityType: "USER",
+                entityId: user.id,
+                userId: user.id,
+                ipAddress: ipAddress || null
+            });
+
+            const accessToken = jwt.sign(
+                {
+                    userId: user.id,
+                    role: user.role,
+                    kycStatus: user.kycStatus,
+                    sessionId: session.id
+                },
+                env.JWT_SECRET,
+                { expiresIn: '15m' }
+            );
+
+            return { accessToken, refreshToken, session };
+        });
     }
 
     static async invalidateSession(sessionId: string) {
         await db.update(sessions)
             .set({ revoked: true })
             .where(eq(sessions.id, sessionId));
+    }
+
+    static async logFailedLogin(userId: string, ipAddress?: string) {
+        await db.insert(auditLogs).values({
+            action: "LOGIN_FAILED",
+            entityType: "USER",
+            entityId: userId,
+            userId: userId,
+            ipAddress: ipAddress || null
+        });
     }
 }
