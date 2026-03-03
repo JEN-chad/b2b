@@ -72,6 +72,37 @@ export const kycRecords = pgTable("kyc_records", {
     reviewedAt: timestamp("reviewed_at"),
 });
 
+// Listing Enums
+export const assetTypeEnum = pgEnum("asset_type", ["SAAS", "ECOMMERCE", "BLOG", "APP", "DOMAIN"]);
+export const listingStatusEnum = pgEnum("listing_status", ["DRAFT", "UNDER_REVIEW", "CHANGES_REQUESTED", "APPROVED", "LIVE", "LOCKED", "SOLD"]);
+export const listingVisibilityEnum = pgEnum("listing_visibility", ["PUBLIC", "PRIVATE"]);
+export const documentTypeEnum = pgEnum("document_type", ["FINANCIAL_PROOF", "ANALYTICS_PROOF", "OWNERSHIP_PROOF"]);
+
+export const listings = pgTable("listings", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sellerId: uuid("seller_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    slug: text("slug").notNull().unique(),
+    assetType: assetTypeEnum("asset_type").notNull(),
+    industry: text("industry").notNull(),
+    revenueMonthly: integer("revenue_monthly").notNull().default(0),
+    profitMonthly: integer("profit_monthly").notNull().default(0),
+    askingPrice: integer("asking_price").notNull(),
+    status: listingStatusEnum("status").notNull().default("DRAFT"),
+    visibility: listingVisibilityEnum("visibility").notNull().default("PRIVATE"),
+    ndaRequired: boolean("nda_required").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const listingDocuments = pgTable("listing_documents", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    listingId: uuid("listing_id").notNull().references(() => listings.id, { onDelete: "cascade" }),
+    type: documentTypeEnum("type").notNull(),
+    storageKey: text("storage_key").notNull(),
+    verified: boolean("verified").notNull().default(false),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
     profile: one(profiles, {
@@ -83,7 +114,23 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     kycRecord: one(kycRecords, {
         fields: [users.id],
         references: [kycRecords.userId],
-    })
+    }),
+    listings: many(listings),
+}));
+
+export const listingsRelations = relations(listings, ({ one, many }) => ({
+    seller: one(users, {
+        fields: [listings.sellerId],
+        references: [users.id],
+    }),
+    documents: many(listingDocuments),
+}));
+
+export const listingDocumentsRelations = relations(listingDocuments, ({ one }) => ({
+    listing: one(listings, {
+        fields: [listingDocuments.listingId],
+        references: [listings.id],
+    }),
 }));
 
 export const profilesRelations = relations(profiles, ({ one }) => ({

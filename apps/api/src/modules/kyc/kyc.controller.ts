@@ -65,7 +65,11 @@ export class KycController {
 
             res.json({ message: `KYC record updated to ${status}` });
         } catch (e: any) {
-            res.status(400).json({ error: e.errors || "Invalid input" });
+            console.error("reviewKYC error:", e);
+            if (e.errors) {
+                return res.status(400).json({ error: e.errors });
+            }
+            res.status(400).json({ error: e.message || "Invalid input" });
         }
     }
 }

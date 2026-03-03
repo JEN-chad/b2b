@@ -14,6 +14,10 @@ app.use("/auth", authRoutes);
 import { kycRoutes } from "./modules/kyc/kyc.routes";
 app.use("/kyc", kycRoutes);
 
+import { listingRoutes } from "./modules/listing/listing.routes";
+app.use("/", listingRoutes);
+
+
 // Health check endpoint
 app.get("/health", (req, res) => {
     res.status(200).json({ status: "OK" });
