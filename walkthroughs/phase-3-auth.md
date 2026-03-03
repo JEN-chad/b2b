@@ -26,7 +26,7 @@ curl -X POST http://localhost:8000/auth/signup \
 -H "Content-Type: application/json" \
 -d '{
   "email": "testuser@example.com",
-  "fullName": "Test Admin"
+  "password": "TestAdmin123"
 }'
 ```
 
@@ -42,24 +42,11 @@ curl -X POST http://localhost:8000/auth/verify-email \
 -H "Content-Type: application/json" \
 -d '{
   "email": "testuser@example.com",
-  "token": "123456"   # Replace with the real OTP from Step 1 terminal
+  "code": "123456"   # Replace with the real OTP from Step 1 terminal
 }'
 ```
 
-### Step 3: Secure Login Request
-Your email is now verified! Now you must request a fresh login session. This triggers another OTP generation for security.
-
-**Using cURL:**
-```bash
-curl -X POST http://localhost:8000/auth/login-request \
--H "Content-Type: application/json" \
--d '{
-  "email": "testuser@example.com"
-}'
-```
-*Again, check your API server terminal for the newly generated OTP.*
-
-### Step 4: Finalize Login (Obtain Tokens!)
+### Step 3: Finalize Login (Obtain Tokens!)
 
 Finally, submit the new login OTP. 
 
@@ -69,7 +56,7 @@ curl -X POST http://localhost:8000/auth/login \
 -H "Content-Type: application/json" \
 -d '{
   "email": "testuser@example.com",
-  "token": "654321"   # Replace with the second terminal OTP
+  "code": "654321"   # Replace with the second terminal OTP
 }'
 ```
 
