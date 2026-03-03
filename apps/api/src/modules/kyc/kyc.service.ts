@@ -1,5 +1,5 @@
 import { db, users, kycRecords, auditLogs } from "@b2b/db";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import crypto from "crypto";
 import { env } from "@b2b/config";
 
@@ -89,7 +89,12 @@ export class KycService {
                 reviewerId,
                 rejectionReason: rejectionReason || null,
                 reviewedAt: new Date()
-            }).where(eq(kycRecords.id, kycId)).returning();
+            }).where(
+                or(
+                    eq(kycRecords.id, kycId),
+                    eq(kycRecords.userId, kycId)
+                )
+            ).returning();
 
             if (!record) {
                 throw new Error("KYC record not found");
@@ -104,7 +109,7 @@ export class KycService {
             await tx.insert(auditLogs).values({
                 action: `KYC_${status}`,
                 entityType: "KYC_RECORD",
-                entityId: kycId,
+                entityId: record.id,
                 userId: reviewerId, // The admin mapping
                 metadata: { reason: rejectionReason }
             });
