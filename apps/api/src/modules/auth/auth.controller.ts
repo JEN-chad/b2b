@@ -91,4 +91,36 @@ export class AuthController {
         res.clearCookie("refreshToken");
         res.json({ message: "Logged out successfully" });
     }
+
+    static async refresh(req: Request, res: Response) {
+        try {
+            const { accessToken, refreshToken } = req.cookies;
+
+            if (!accessToken || !refreshToken) {
+                return res.status(401).json({ error: "Missing tokens" });
+            }
+
+            const tokens = await AuthService.refreshSession(accessToken, refreshToken, req.ip);
+
+            res.cookie("accessToken", tokens.accessToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "strict",
+                maxAge: 15 * 60 * 1000 // 15 mins
+            });
+
+            res.cookie("refreshToken", tokens.refreshToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "strict",
+                maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+            });
+
+            res.json({ message: "Tokens refreshed successfully" });
+        } catch (e: any) {
+            res.clearCookie("accessToken");
+            res.clearCookie("refreshToken");
+            res.status(401).json({ error: e.message || "Invalid refresh token" });
+        }
+    }
 }

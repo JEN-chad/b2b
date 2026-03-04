@@ -1,5 +1,5 @@
 import { db, users, sessions, otpTokens, profiles, auditLogs } from "@b2b/db";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, or, lt } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { env } from "@b2b/config";
@@ -114,6 +114,18 @@ export class AuthService {
         const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
 
         return await db.transaction(async (tx) => {
+            // Cleanup expired or revoked sessions for this user to prevent accumulation
+            await tx.delete(sessions)
+                .where(
+                    and(
+                        eq(sessions.userId, user.id),
+                        or(
+                            eq(sessions.revoked, true),
+                            lt(sessions.expiresAt, new Date())
+                        )
+                    )
+                );
+
             const [session] = await tx.insert(sessions).values({
                 userId: user.id,
                 refreshTokenHash,
@@ -144,9 +156,7 @@ export class AuthService {
     }
 
     static async invalidateSession(sessionId: string) {
-        await db.update(sessions)
-            .set({ revoked: true })
-            .where(eq(sessions.id, sessionId));
+        await db.delete(sessions).where(eq(sessions.id, sessionId));
     }
 
     static async logFailedLogin(userId: string, ipAddress?: string) {
@@ -156,6 +166,77 @@ export class AuthService {
             entityId: userId,
             userId: userId,
             ipAddress: ipAddress || null
+        });
+    }
+
+    static async refreshSession(accessToken: string, refreshToken: string, ipAddress?: string) {
+        let decoded: any;
+        try {
+            decoded = jwt.verify(accessToken, env.JWT_SECRET, { ignoreExpiration: true });
+        } catch (err) {
+            throw new Error("Invalid access token format");
+        }
+
+        const sessionId = decoded.sessionId;
+        if (!sessionId) {
+            throw new Error("Invalid session data in token");
+        }
+
+        return await db.transaction(async (tx) => {
+            const [session] = await tx.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+
+            if (!session) {
+                throw new Error("Session not found");
+            }
+
+            if (session.revoked || session.expiresAt < new Date()) {
+                await tx.delete(sessions).where(eq(sessions.id, sessionId));
+                throw new Error("Session expired or revoked");
+            }
+
+            const isValid = await bcrypt.compare(refreshToken, session.refreshTokenHash);
+            if (!isValid) {
+                await tx.delete(sessions).where(eq(sessions.id, sessionId));
+                throw new Error("Invalid refresh token");
+            }
+
+            const newRefreshToken = crypto.randomBytes(40).toString('hex');
+            const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
+
+            await tx.delete(sessions).where(eq(sessions.id, sessionId));
+
+            const [user] = await tx.select().from(users).where(eq(users.id, session.userId)).limit(1);
+
+            if (!user) {
+                throw new Error("User not found");
+            }
+
+            const [newSession] = await tx.insert(sessions).values({
+                userId: user.id,
+                refreshTokenHash: newRefreshTokenHash,
+                expiresAt: addDays(new Date(), 7),
+            }).returning();
+
+            await tx.insert(auditLogs).values({
+                action: "SESSION_REFRESHED",
+                entityType: "USER",
+                entityId: user.id,
+                userId: user.id,
+                ipAddress: ipAddress || null
+            });
+
+            const newAccessToken = jwt.sign(
+                {
+                    userId: user.id,
+                    role: user.role,
+                    kycStatus: user.kycStatus,
+                    sessionId: newSession.id
+                },
+                env.JWT_SECRET,
+                { expiresIn: '15m' }
+            );
+
+            return { accessToken: newAccessToken, refreshToken: newRefreshToken, session: newSession };
         });
     }
 }
