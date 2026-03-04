@@ -17,6 +17,11 @@ app.use("/kyc", kycRoutes);
 import { listingRoutes } from "./modules/listing/listing.routes";
 app.use("/", listingRoutes);
 
+import { buyerRoutes } from "./modules/buyer/buyer.routes";
+app.use("/", buyerRoutes);
+
+import { sellerRoutes } from "./modules/seller/seller.routes";
+app.use("/", sellerRoutes);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
