@@ -21,8 +21,7 @@ router.post("/signup", AuthController.signup);
 router.post("/login", loginLimiter, AuthController.login);
 router.post("/verify-email", otpLimiter, AuthController.verifyEmail);
 
-// TODO: Implement refresh functionality later
-// router.post("/refresh", AuthController.refresh);
+router.post("/refresh", AuthController.refresh);
 
 router.post("/logout", requireAuth, AuthController.logout);
 
