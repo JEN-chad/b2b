@@ -116,6 +116,11 @@ export const usersRelations = relations(users, ({ one, many }) => ({
         references: [kycRecords.userId],
     }),
     listings: many(listings),
+    buyerOffers: many(offers, { relationName: "buyerOffers" }),
+    sellerDealRooms: many(dealRooms, { relationName: "sellerDealRooms" }),
+    buyerDealRooms: many(dealRooms, { relationName: "buyerDealRooms" }),
+    ndas: many(ndas),
+    unlockRecords: many(unlockRecords)
 }));
 
 export const listingsRelations = relations(listings, ({ one, many }) => ({
@@ -124,6 +129,10 @@ export const listingsRelations = relations(listings, ({ one, many }) => ({
         references: [users.id],
     }),
     documents: many(listingDocuments),
+    offers: many(offers),
+    ndas: many(ndas),
+    unlockRecords: many(unlockRecords),
+    dealRooms: many(dealRooms),
 }));
 
 export const listingDocumentsRelations = relations(listingDocuments, ({ one }) => ({
@@ -151,5 +160,100 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
     user: one(users, {
         fields: [auditLogs.userId],
         references: [users.id],
+    }),
+}));
+
+// -----------------------------------------------------------------------------
+// Phase 6: Buyer Interaction System
+// -----------------------------------------------------------------------------
+
+export const offerStatusEnum = pgEnum("offer_status", ["PENDING", "COUNTERED", "ACCEPTED", "REJECTED", "EXPIRED"]);
+export const dealRoomStatusEnum = pgEnum("deal_room_status", ["INITIATED", "ESCROW_PENDING", "ESCROW_FUNDED", "DUE_DILIGENCE", "AGREEMENT_SIGNED", "TRANSFER_IN_PROGRESS", "COMPLETED", "CANCELLED", "AWAITING_CONFIRMATION"]);
+
+export const ndas = pgTable("ndas", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    buyerId: uuid("buyer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    listingId: uuid("listing_id").notNull().references(() => listings.id, { onDelete: "cascade" }),
+    signedAt: timestamp("signed_at").notNull().defaultNow(),
+});
+
+export const ndasRelations = relations(ndas, ({ one }) => ({
+    buyer: one(users, {
+        fields: [ndas.buyerId],
+        references: [users.id],
+    }),
+    listing: one(listings, {
+        fields: [ndas.listingId],
+        references: [listings.id],
+    }),
+}));
+
+export const offers = pgTable("offers", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    listingId: uuid("listing_id").notNull().references(() => listings.id, { onDelete: "cascade" }),
+    buyerId: uuid("buyer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    price: integer("price").notNull(),
+    terms: text("terms"),
+    status: offerStatusEnum("status").notNull().default("PENDING"),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const offersRelations = relations(offers, ({ one }) => ({
+    listing: one(listings, {
+        fields: [offers.listingId],
+        references: [listings.id],
+    }),
+    buyer: one(users, {
+        fields: [offers.buyerId],
+        references: [users.id],
+        relationName: "buyerOffers",
+    }),
+}));
+
+export const unlockRecords = pgTable("unlock_records", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    buyerId: uuid("buyer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    listingId: uuid("listing_id").notNull().references(() => listings.id, { onDelete: "cascade" }),
+    unlockedAt: timestamp("unlocked_at").notNull().defaultNow(),
+});
+
+export const unlockRecordsRelations = relations(unlockRecords, ({ one }) => ({
+    buyer: one(users, {
+        fields: [unlockRecords.buyerId],
+        references: [users.id],
+    }),
+    listing: one(listings, {
+        fields: [unlockRecords.listingId],
+        references: [listings.id],
+    }),
+}));
+
+// Phase 7 Stub for auto-creating deal room after offer acceptance
+export const dealRooms = pgTable("deal_rooms", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    listingId: uuid("listing_id").notNull().references(() => listings.id, { onDelete: "cascade" }),
+    buyerId: uuid("buyer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    sellerId: uuid("seller_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    status: dealRoomStatusEnum("status").notNull().default("INITIATED"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const dealRoomsRelations = relations(dealRooms, ({ one }) => ({
+    listing: one(listings, {
+        fields: [dealRooms.listingId],
+        references: [listings.id],
+    }),
+    buyer: one(users, {
+        fields: [dealRooms.buyerId],
+        references: [users.id],
+        relationName: "buyerDealRooms"
+    }),
+    seller: one(users, {
+        fields: [dealRooms.sellerId],
+        references: [users.id],
+        relationName: "sellerDealRooms"
     }),
 }));
