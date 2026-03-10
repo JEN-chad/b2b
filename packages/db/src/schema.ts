@@ -230,7 +230,13 @@ export const unlockRecordsRelations = relations(unlockRecords, ({ one }) => ({
     }),
 }));
 
-// Phase 7 Stub for auto-creating deal room after offer acceptance
+// -----------------------------------------------------------------------------
+// Phase 7: Deal Room Engine
+// -----------------------------------------------------------------------------
+
+export const dealTaskAssignedToEnum = pgEnum("deal_task_assigned_to", ["BUYER", "SELLER"]);
+export const escrowStatusEnum = pgEnum("escrow_status", ["PENDING", "FUNDED", "RELEASED", "REFUNDED", "FAILED"]);
+
 export const dealRooms = pgTable("deal_rooms", {
     id: uuid("id").defaultRandom().primaryKey(),
     listingId: uuid("listing_id").notNull().references(() => listings.id, { onDelete: "cascade" }),
@@ -241,7 +247,28 @@ export const dealRooms = pgTable("deal_rooms", {
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const dealRoomsRelations = relations(dealRooms, ({ one }) => ({
+export const dealTasks = pgTable("deal_tasks", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    dealRoomId: uuid("deal_room_id").notNull().references(() => dealRooms.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    assignedTo: dealTaskAssignedToEnum("assigned_to").notNull(),
+    completed: boolean("completed").notNull().default(false),
+    completedAt: timestamp("completed_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const escrowTransactions = pgTable("escrow_transactions", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    dealRoomId: uuid("deal_room_id").notNull().references(() => dealRooms.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    externalId: text("external_id").notNull(),
+    amount: integer("amount").notNull(),
+    status: escrowStatusEnum("status").notNull().default("PENDING"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const dealRoomsRelations = relations(dealRooms, ({ one, many }) => ({
     listing: one(listings, {
         fields: [dealRooms.listingId],
         references: [listings.id],
@@ -255,5 +282,21 @@ export const dealRoomsRelations = relations(dealRooms, ({ one }) => ({
         fields: [dealRooms.sellerId],
         references: [users.id],
         relationName: "sellerDealRooms"
+    }),
+    tasks: many(dealTasks),
+    escrowTransactions: many(escrowTransactions),
+}));
+
+export const dealTasksRelations = relations(dealTasks, ({ one }) => ({
+    dealRoom: one(dealRooms, {
+        fields: [dealTasks.dealRoomId],
+        references: [dealRooms.id],
+    }),
+}));
+
+export const escrowTransactionsRelations = relations(escrowTransactions, ({ one }) => ({
+    dealRoom: one(dealRooms, {
+        fields: [escrowTransactions.dealRoomId],
+        references: [dealRooms.id],
     }),
 }));
