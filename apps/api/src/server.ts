@@ -23,6 +23,9 @@ app.use("/", buyerRoutes);
 import { sellerRoutes } from "./modules/seller/seller.routes";
 app.use("/", sellerRoutes);
 
+import { dealRoomRoutes } from "./modules/dealroom/dealroom.routes";
+app.use("/", dealRoomRoutes);
+
 // Health check endpoint
 app.get("/health", (req, res) => {
     res.status(200).json({ status: "OK" });

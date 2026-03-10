@@ -1,5 +1,5 @@
 import { db } from "@b2b/db";
-import { offers, listings, dealRooms, auditLogs } from "@b2b/db";
+import { offers, listings, dealRooms, dealTasks, auditLogs } from "@b2b/db";
 import { eq, and } from "drizzle-orm";
 
 export class SellerService {
@@ -47,7 +47,7 @@ export class SellerService {
                 .where(eq(offers.id, offerId))
                 .returning();
 
-            // 3. If accepted, auto-create a Deal Room (Phase 7 rule from Phase 6 instructions) - Deal room auto-created when offer ACCEPTED
+            // 3. If accepted, auto-create a Deal Room and default tasks (Phase 7)
             let newDealRoom = null;
             if (status === "ACCEPTED") {
                 const [insertedRoom] = await tx
@@ -61,6 +61,25 @@ export class SellerService {
                     .returning();
 
                 newDealRoom = insertedRoom;
+
+                // Create default checklist tasks for the deal room
+                const defaultTasks = [
+                    { title: "Deposit escrow funds", assignedTo: "BUYER" as const },
+                    { title: "Provide asset access credentials", assignedTo: "SELLER" as const },
+                    { title: "Complete due diligence review", assignedTo: "BUYER" as const },
+                    { title: "Sign transfer agreement", assignedTo: "SELLER" as const },
+                    { title: "Transfer asset ownership", assignedTo: "SELLER" as const },
+                    { title: "Update DNS / domain records", assignedTo: "SELLER" as const },
+                    { title: "Confirm asset receipt", assignedTo: "BUYER" as const },
+                ];
+
+                await tx.insert(dealTasks).values(
+                    defaultTasks.map((task) => ({
+                        dealRoomId: insertedRoom.id,
+                        title: task.title,
+                        assignedTo: task.assignedTo,
+                    }))
+                );
             }
 
             // 4. Audit Log

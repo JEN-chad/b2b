@@ -15,6 +15,13 @@
       "when": 1772595627232,
       "tag": "0001_groovy_misty_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1773157045456,
+      "tag": "0002_numerous_franklin_storm",
+      "breakpoints": true
     }
   ]
 }

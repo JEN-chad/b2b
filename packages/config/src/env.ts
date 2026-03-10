@@ -11,6 +11,7 @@ export const envSchema = z.object({
     JWT_SECRET: z.string(),
     JWT_REFRESH_SECRET: z.string(),
     KYC_ENFORCEMENT: z.enum(["STRICT", "BYPASS"]).default("STRICT"),
+    ESCROW_WEBHOOK_SECRET: z.string().default("escrow_webhook_dev_secret"),
 });
 
 export type Env = z.infer<typeof envSchema>;
